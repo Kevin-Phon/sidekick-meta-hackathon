@@ -1,0 +1,4 @@
+export type Source = {id:string;provider_id:string;connection_id:string;kind:string;title:string;body:string;url?:string;due_at?:string;due_original?:string;timezone_known:boolean;metadata:Record<string,unknown>;revision:number;fetched_at:string};
+export type Task = {id:string;source_id:string;title:string;status:string;due_at?:string;snoozed_until?:string;reason:string};
+export type Draft = {id:string;kind:string;title:string;markdown:string;status:string;source_refs:{id:string;revision:number}[];provider:string;model:string;generated_at:string};
+export type State = {sources:Source[];tasks:Task[];drafts:Draft[];checks:{id:string;finished_at:string;draft_count:number;message:string}[];profile:{name:string;goal:string;daily_enabled:boolean;timezone:string};connections:{id:string;name:string;status:string;detail:string}[];next_run:string;mode:string;eligibility:string};

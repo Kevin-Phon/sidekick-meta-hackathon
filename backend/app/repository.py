@@ -53,6 +53,10 @@ class Repository:
                     counts['new_count'] += 1
                 elif changed:
                     counts['changed_count'] += 1
+                if changed:
+                    for draft in self.records('drafts', db):
+                        if any(r['id'] == item['id'] for r in draft['source_refs']):
+                            db.execute('DELETE FROM records WHERE kind=? AND id=?', ('drafts', draft['id']))
                 self._put(db, 'sources', item)
                 existing[item['id']] = item
                 if item['kind'] in {'assignment', 'project_note'}:
