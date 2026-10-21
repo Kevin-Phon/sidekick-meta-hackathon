@@ -86,3 +86,62 @@ def test_source_update_invalidates_obsolete_drafts(tmp_path):
     assert state['drafts'][0]['source_refs'][0]['revision'] == 2
     export = c.get('/api/drafts/' + state['drafts'][0]['id'] + '/download').text
     assert 'source_outline' in export and 'revision 2' in export
+
+
+def test_key_stays_in_memory_and_generation_requires_selected_source_consent(tmp_path, monkeypatch):
+    from app.model import MetaClient
+    monkeypatch.delenv('MODEL_API_KEY', raising=False)
+    c = connected(tmp_path)
+    assert c.post('/api/model/key', json={'key': 'test-secret'}).status_code == 200
+    state = c.get('/api/state').json()
+    assert 'test-secret' not in str(state)
+    assert state['model']['configured'] is True and state['model']['verified'] is False
+    c.post('/api/demo')
+    source = next(s for s in c.get('/api/state').json()['sources'] if s['kind'] == 'lecture')
+    assert c.post('/api/model/generate', json={'source_ids': [source['id']]}).status_code == 400
+    def generate(self, sources):
+        assert len(sources) == 1
+        return {'kind': 'study_guide', 'markdown': '## Key ideas\nVerified transport test', 'source_refs': [{'id': source['id'], 'revision': 1}], 'provider': 'meta', 'model': 'muse-spark-1.3', 'status': 'review_needed'}
+    monkeypatch.setattr(MetaClient, 'generate', generate)
+    result = c.post('/api/model/generate', json={'source_ids': [source['id']], 'source_revisions': {source['id']: 1}, 'source_hashes': {source['id']: source['content_hash']}, 'consent': True})
+    assert result.status_code == 200
+    saved = c.get('/api/state').json()
+    assert saved['model']['verified'] is True
+    assert any(d['provider'] == 'meta' for d in saved['drafts'])
+    assert 'test-secret' not in (tmp_path / 'sidekick.db').read_bytes().decode('latin1')
+    assert connected(tmp_path).get('/api/state').json()['model']['configured'] is False
+    assert c.post('/api/model/key', json={'key': ''}).status_code == 200
+    assert c.get('/api/state').json()['model']['configured'] is False
+
+
+def test_source_consent_is_bound_to_the_previewed_revision(tmp_path, monkeypatch):
+    from app.model import MetaClient
+    monkeypatch.delenv('MODEL_API_KEY', raising=False)
+    c = connected(tmp_path)
+    c.post('/api/model/key', json={'key': 'test'})
+    c.post('/api/import', json={'items': [{'provider_id': 'same', 'title': 'Lecture', 'body': 'Originally approved'}]})
+    original = c.get('/api/state').json()['sources'][0]
+    c.post('/api/import', json={'items': [{'provider_id': 'same', 'title': 'Lecture', 'body': 'Private new material'}]})
+    calls = []
+    monkeypatch.setattr(MetaClient, 'generate', lambda self, sources: calls.append(sources))
+    result = c.post('/api/model/generate', json={'source_ids': [original['id']], 'source_revisions': {original['id']: 1}, 'consent': True})
+    assert result.status_code == 400
+    assert calls == []
+
+
+def test_deleted_and_recreated_source_does_not_reuse_old_approval(tmp_path, monkeypatch):
+    from app.model import MetaClient
+    c = connected(tmp_path)
+    c.post('/api/model/key', json={'key': 'test'})
+    c.post('/api/import', json={'items': [{'provider_id': 'same', 'title': 'Lecture', 'body': 'Originally approved'}]})
+    original = c.get('/api/state').json()['sources'][0]
+    c.delete('/api/sources/' + original['id'])
+    c.post('/api/import', json={'items': [{'provider_id': 'same', 'title': 'Lecture', 'body': 'Private replacement'}]})
+    calls = []
+    def generate(self, sources):
+        calls.append(sources)
+        return {'kind': 'study_guide', 'markdown': 'test', 'source_refs': [{'id': original['id'], 'revision': 1}], 'provider': 'meta', 'model': 'muse-spark-1.3', 'status': 'review_needed'}
+    monkeypatch.setattr(MetaClient, 'generate', generate)
+    result = c.post('/api/model/generate', json={'source_ids': [original['id']], 'source_revisions': {original['id']: 1}, 'source_hashes': {original['id']: original['content_hash']}, 'consent': True})
+    assert result.status_code == 400
+    assert calls == []

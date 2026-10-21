@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
 import json
+import os
+from uuid import uuid4
 import secrets
 import threading
 from contextlib import asynccontextmanager, suppress
@@ -17,6 +19,7 @@ from pypdf import PdfReader
 from app.config import Settings
 from app.demo import demo_items
 from app.preparation import prepare
+from app.model import MetaClient, ModelError, MODEL
 from app.repository import Repository
 from app.scheduler import next_daily_run, should_catch_up
 
@@ -38,6 +41,11 @@ def create_app(settings):
     repo = Repository(settings.data_dir / 'sidekick.db')
     session = secrets.token_urlsafe(32)
     run_lock = threading.Lock()
+    model_state = {'key': os.environ.get('MODEL_API_KEY', ''), 'verified': False, 'last_error': ''}
+
+    def model_status():
+        return {'configured': bool(model_state['key']), 'verified': model_state['verified'],
+                'model': MODEL, 'mode': 'Standard', 'last_error': model_state['last_error']}
 
     def check():
         if not run_lock.acquire(blocking=False):
@@ -108,11 +116,11 @@ def create_app(settings):
     @app.get('/api/state')
     def state():
         saved = repo.snapshot()
-        return {**saved, 'connections': [
+        return {**saved, 'model': model_status(), 'connections': [
             {'id': 'imports', 'name': 'Course & project files', 'status': 'local', 'detail': 'Saved snapshots. Import new material to update them.'},
             {'id': 'canvas', 'name': 'Canvas', 'status': 'blocked', 'detail': 'CPP requires an administrator-approved connection. Import course files for now.'},
             {'id': 'gmail', 'name': 'Gmail', 'status': 'not_connected', 'detail': 'Independent app authorization is not configured.'},
-            {'id': 'meta', 'name': 'Meta AI', 'status': 'not_connected', 'detail': 'No API credential or live model request has been configured in this app.'}],
+            {'id': 'meta', 'name': 'Meta AI', 'status': 'connected' if model_state['verified'] else 'configured' if model_state['key'] else 'not_connected', 'detail': 'Muse Spark 1.3 Standard. Selected-source requests only. ' + ('A real generation has succeeded.' if model_state['verified'] else 'Live generation not yet verified.')}],
             'next_run': next_daily_run(datetime.now(timezone.utc)).isoformat(),
             'mode': 'sample' if any(x['metadata'].get('demo') for x in saved['sources']) else 'local',
             'eligibility': 'Preparatory prototype. Hackathon build-window eligibility is not yet verified.'}
@@ -197,9 +205,58 @@ def create_app(settings):
         exported = f'# {draft["title"]}\n\nReview required. Provider: {draft["provider"]}; model: {draft["model"]}.\nGenerated: {draft["generated_at"]}\n\n{draft["markdown"]}\n\n## Source references\n{refs}\n'
         return Response(exported, media_type='text/markdown', headers={'Content-Disposition': f'attachment; filename="sidekick-{draft["kind"]}.md"'})
 
+    @app.post('/api/model/key')
+    async def model_key(request: Request):
+        payload = json.loads(await read_limited(request))
+        key = payload.get('key') if isinstance(payload, dict) else None
+        if not isinstance(key, str) or len(key) > 1000 or any(ord(c) < 33 or ord(c) > 126 for c in key):
+            raise ValueError('Enter a valid API key without spaces, or leave it blank to disconnect.')
+        if run_lock.locked():
+            raise HTTPException(409, 'Wait for the current preparation before changing the key.')
+        model_state.update(key=key, verified=False, last_error='')
+        return model_status()
+
+    def generate_selected(payload):
+        if not model_state['key']:
+            raise HTTPException(409, 'Meta AI is not connected. Add an API key in Memory & connections.')
+        if not isinstance(payload, dict) or payload.get('consent') is not True:
+            raise ValueError('Approve sending the selected material to Meta before generating.')
+        ids = payload.get('source_ids')
+        if not isinstance(ids, list) or not 1 <= len(ids) <= 4 or any(not isinstance(i, str) for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError('Choose one to four distinct source IDs.')
+        if not run_lock.acquire(blocking=False):
+            raise HTTPException(409, 'A preparation is already running.')
+        try:
+            saved = {s['id']: s for s in repo.snapshot()['sources']}
+            if any(i not in saved for i in ids):
+                raise ValueError('A selected source is no longer available. Reload and select again.')
+            revisions = payload.get('source_revisions')
+            if not isinstance(revisions, dict) or any(type(revisions.get(i)) is not int or revisions[i] != saved[i]['revision'] for i in ids):
+                raise ValueError('Selected material changed or approval is incomplete. Reload its preview and approve again.')
+            hashes = payload.get('source_hashes')
+            if not isinstance(hashes, dict) or any(not isinstance(hashes.get(i), str) or hashes[i] != saved[i]['content_hash'] for i in ids):
+                raise ValueError('Selected material no longer matches your preview. Reload and approve again.')
+            sources = [saved[i] for i in ids]
+            if sources[0]['kind'] not in {'lecture', 'assignment', 'project_note'}:
+                raise ValueError('Start with a lecture, assignment, or project note.')
+            try:
+                result = MetaClient(model_state['key']).generate(sources)
+            except ModelError as exc:
+                model_state['last_error'] = str(exc)
+                raise HTTPException(502, str(exc)) from None
+            draft = {**result, 'id': uuid4().hex, 'title': sources[0]['title'] + ' · Muse Spark'}
+            repo.save_generated_draft(draft, sources)
+            model_state.update(verified=True, last_error='')
+            return {'draft_id': draft['id'], 'model': MODEL}
+        finally:
+            run_lock.release()
+
     @app.post('/api/model/generate')
-    def model_unavailable():
-        raise HTTPException(409, 'Meta AI is not connected. Sample answers are prewritten; source outlines are not AI generations.')
+    async def model_generate(request: Request):
+        if not model_state['key']:
+            raise HTTPException(409, 'Meta AI is not connected. Add an API key in Memory & connections.')
+        payload = json.loads(await read_limited(request))
+        return await asyncio.to_thread(generate_selected, payload)
 
     frontend = ROOT / 'frontend' / 'dist'
     if frontend.exists():

@@ -84,6 +84,14 @@ class Repository:
         with self.db() as db:
             self._put(db, 'drafts', {**draft, 'generated_at': draft.get('generated_at', now_iso())})
 
+    def save_generated_draft(self, draft, supplied_sources):
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current = {(s['id'], s['revision'], s['content_hash']) for s in self.records('sources', db)}
+            if any((s['id'], s['revision'], s['content_hash']) not in current for s in supplied_sources):
+                raise ValueError('Source material changed during generation. The draft was not saved; reload before retrying.')
+            self._put(db, 'drafts', {**draft, 'generated_at': draft.get('generated_at', now_iso())})
+
     def save_check(self, check):
         with self.db() as db:
             self._put(db, 'checks', check)

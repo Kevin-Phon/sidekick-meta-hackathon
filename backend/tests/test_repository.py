@@ -33,3 +33,15 @@ def test_profile_and_notes_survive_restart(tmp_path):
     state = Repository(tmp_path / 'test.db').snapshot()
     assert state['profile']['goal'] == 'Understand the method'
     assert state['sources'][0]['body'] == 'Next: test the camera'
+
+
+def test_generation_cannot_save_after_source_is_deleted_and_recreated(tmp_path):
+    import pytest
+    repo = Repository(tmp_path / 'data.db')
+    repo.import_items([{'provider_id': 'same', 'title': 'Notes', 'body': 'Original'}])
+    source = repo.snapshot()['sources'][0]
+    repo.delete_source(source['id'])
+    repo.import_items([{'provider_id': 'same', 'title': 'Notes', 'body': 'Replacement'}])
+    with pytest.raises(ValueError, match='changed'):
+        repo.save_generated_draft({'id': 'draft', 'source_refs': [{'id': source['id'], 'revision': 1}]}, [source])
+    assert repo.snapshot()['drafts'] == []
