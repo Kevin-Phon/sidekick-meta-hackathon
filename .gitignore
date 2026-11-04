@@ -10,3 +10,8 @@ dist/
 .DS_Store
 
 *.tsbuildinfo
+
+# Local Google OAuth downloads must never be published.
+client_secret*.json
+credentials.json
+token.json

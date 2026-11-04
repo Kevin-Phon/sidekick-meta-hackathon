@@ -16,7 +16,7 @@ Run locally using the instructions below. Start with an empty workspace: upload 
 
 Muse Spark setup is in Memory & connections. Use a fresh unshared key in the password field. One agent run makes at most three API requests (one plan and up to two preparations); unchanged input skips the model. The everyday dashboard has no seeded examples. Optional samples live under Memory & connections → Saved sources and sample workspace. Start clean workspace preserves previous material and lets you switch back. New installations have no prefilled personal profile.
 
-No live Gmail/Canvas accounts are connected. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. The Connect Gmail entry explains that a separate Google authorization setup is required; saved-email import works now. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
+Canvas remains file-import only. Gmail now has a session-only read-only Google OAuth connection; a real account connection remains unverified until developer setup and Google consent complete. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. When Google developer setup is configured, Connect Gmail opens Google sign-in directly. Without it, the app explains the one-time setup. Saved-email import also works. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
 
 ## Visual learning (November 4)
 
@@ -25,6 +25,19 @@ In School, choose **Explain with Meta** on a lecture or assignment. Review the e
 Lessons show a short overview, beginner-friendly steps with small examples, and up to two interactive concept diagrams when useful. Muse Spark supplies validated nodes and connections; Sidekick draws those as SVG. This is a teaching sketch, not a separate image-generation service or an exact reproduction of the lecture. Click a concept to read its explanation, and compare it with the original slide. Image interpretation and connections still need review.
 
 Original PDFs are stored privately in the local SQLite database, bound to the source content hash. Older text-only imports need the original PDF added again. Local rendering is bounded to 1,400 pixels and 400 KB per page image; page images are sent only with explicit approval. Automated tests cover image payloads, output validation, source/version binding, and the lesson interface. One live visual generation was verified November 4 using approved lecture text and two selected page images: two interactive concept diagrams and five teaching steps were saved and survived reload. The private source and result are not published. Extended notes are collapsed by default. The published video demonstrates the earlier agent workflow.
+
+## Gmail sign-in setup
+
+1. Create a Google Cloud project, enable Gmail API, and configure Google Auth Platform for an External app in Testing mode. Add only your own account as a test user for development.
+2. Create a **Web application** OAuth client with the authorized redirect URI `http://127.0.0.1:8765/oauth/google/callback`.
+3. Open Sidekick at **http://127.0.0.1:8765** (the callback must use the same hostname), choose Mail → Connect Gmail, select the downloaded client JSON, and choose Use Google setup for this session. Alternatively set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the server process environment. Keep downloaded credentials outside this repository.
+4. Click Connect Gmail / Continue with Google, choose your account, and review Google's read-only Gmail permission. The flow verifies the Gmail profile and returns to Mail. Denial does not connect the account.
+
+Client secrets and access tokens stay in server memory. No refresh token is requested; restart or Google access-token expiry requires reconnection. Connections are workspace-bound. Disconnect clears local access and attempts Google token revocation; provider failure is reported honestly. Sign-in uses short-lived single-use state, PKCE, a dedicated callback cookie, fixed endpoints/redirect, bounded provider responses, and sanitized errors. OAuth callback URLs are omitted from access logging.
+
+**Connecting currently verifies account authorization only. It does not import messages, schedule inbox checks, or send mail to Meta.** The existing saved-message workflow still prepares drafts from messages you add manually. Live Gmail inbox import/sorting is a separate follow-up. Gmail read-only is a restricted scope; public distribution may require Google verification. This local testing setup is not a verified public OAuth app.
+
+Official setup: [Google Gmail authorization](https://developers.google.com/workspace/gmail/api/auth/web-server), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes).
 
 ## Costs and stopping
 
@@ -75,7 +88,7 @@ JSON accepts an `items` array with title, body, kind (lecture/assignment/announc
 
 ## Boundaries and storage
 
-All source data, original uploaded PDFs, profile, task progress and prepared drafts persist in `.local/sidekick.db`. The database is owner-readable/writable; it is not encrypted. No API credential is bundled. Gmail and live Canvas are not connected. Muse Spark generation is implemented but live verification needs your key and available API credits. CPP currently requires administrator approval for Canvas access. Sample worked answers are prewritten and labeled. HTML is inert; embedded Markdown images are omitted and the app blocks external media with CSP. Opening a chosen HTTPS source link is a user action.
+All source data, original uploaded PDFs, profile, task progress and prepared drafts persist in `.local/sidekick.db`. The database is owner-readable/writable; it is not encrypted. No API credential is bundled. Gmail OAuth is implemented; inbox import and live Canvas are not implemented. Muse Spark generation is implemented but live verification needs your key and available API credits. CPP currently requires administrator approval for Canvas access. Sample worked answers are prewritten and labeled. HTML is inert; embedded Markdown images are omitted and the app blocks external media with CSP. Opening a chosen HTTPS source link is a user action.
 
 Settings can enable 9 AM America/Los_Angeles preparation of saved material. The service must be running. It catches up after a missed morning. This does not fetch accounts or install a background system job. Nothing is sent, submitted, or marked complete automatically. Source deletion affects that selected source and dependent local records only.
 

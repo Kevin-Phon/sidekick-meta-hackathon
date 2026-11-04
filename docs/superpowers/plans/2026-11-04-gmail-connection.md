@@ -1,0 +1,9 @@
+# Gmail sign-in implementation plan
+
+Kevin requested that Connect Gmail open Google sign-in and asked for help with one-time Google Cloud setup. Routine implementation choices are delegated.
+
+Use the existing FastAPI/React app. Add a real Google OAuth authorization-code flow requesting only gmail.readonly, with state, PKCE, a dedicated HttpOnly SameSite=Lax callback cookie, fixed loopback redirect, short-lived single-use state, and workspace binding. Keep OAuth client secrets and access tokens in process memory; no refresh/background polling or automatic Meta transfer. A restart clears connections. The callback checks Gmail profile to verify permission, not message bodies. Connected status must say no messages have been imported. Reading/importing the inbox is a later explicit action.
+
+Connect Gmail starts Google authorization immediately when configured. Until developer setup is available, a setup dialog accepts downloaded Web OAuth client JSON into this local session and provides exact redirect/Google setup steps. Never use a generic Gmail login link to pretend authorization succeeded. Google sign-in and expanded permissions are approved by Kevin on Google's own page. No credentials in source, logs, browser storage, or URL beyond public client ID and one-time OAuth flow parameters. Disconnect clears local access and attempts provider revocation.
+
+Test first: missing configuration, safe Google authorization URL, restricted scope, single-use state/cookie/expiry/PKCE, callback denial/invalid state, sanitized provider errors, workspace isolation, no token persistence, and configured UI navigation. Then full suites/build, browser review, source privacy scan. Live completion depends on Google Cloud client setup and Kevin's consent; never claim Gmail connected from mocked tests alone.

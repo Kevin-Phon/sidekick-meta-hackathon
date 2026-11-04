@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pypdf import PdfReader
 
@@ -24,6 +24,7 @@ from app.repository import Repository
 from app.agent import AgentRunner, context, fingerprint
 from app.agent_demo import agent_demo
 from app.visual_learning import render_page, approve_pages, teaching_markdown
+from app.gmail import GmailConnection, GmailError, FLOW_COOKIE, CALLBACK_PATH
 from app.scheduler import next_daily_run, should_catch_up
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +43,7 @@ async def read_limited(request):
 
 def create_app(settings):
     repo = Repository(settings.data_dir / 'sidekick.db')
+    gmail = GmailConnection()
     session = secrets.token_urlsafe(32)
     run_lock = threading.Lock()
     model_state = {'key': os.environ.get('MODEL_API_KEY', ''), 'verified': False, 'last_error': ''}
@@ -126,14 +128,52 @@ def create_app(settings):
         for run in runs:
             ids = [r['id'] for r in run['source_refs']]
             run['stale'] = any(i not in by_id for i in ids) or fingerprint(context([by_id[i] for i in ids if i in by_id], saved['tasks'])) != run['fingerprint']
-        return {**saved, 'agent_runs': runs, 'model': model_status(), 'connections': [
+        return {**saved, 'agent_runs': runs, 'model': model_status(), 'gmail': gmail.status(saved['profile'].get('active_workspace') or 'legacy'), 'connections': [
             {'id': 'imports', 'name': 'Course & project files', 'status': 'local', 'detail': 'Saved snapshots. Import new material to update them.'},
             {'id': 'canvas', 'name': 'Canvas', 'status': 'blocked', 'detail': 'CPP requires an administrator-approved connection. Import course files for now.'},
-            {'id': 'gmail', 'name': 'Gmail', 'status': 'not_connected', 'detail': 'Independent app authorization is not configured.'},
+            {'id': 'gmail', 'name': 'Gmail', 'status': 'connected' if gmail.status(saved['profile'].get('active_workspace') or 'legacy')['connected'] else 'not_connected', 'detail': gmail.status(saved['profile'].get('active_workspace') or 'legacy')['detail']},
             {'id': 'meta', 'name': 'Meta AI', 'status': 'connected' if model_state['verified'] else 'configured' if model_state['key'] else 'not_connected', 'detail': 'Muse Spark 1.3 Standard. Selected-source requests only. ' + ('A real generation has succeeded.' if model_state['verified'] else 'Live generation not yet verified.')}],
             'next_run': next_daily_run(datetime.now(timezone.utc)).isoformat(),
             'mode': 'sample' if any(x['metadata'].get('demo') for x in saved['sources']) else 'local',
             'eligibility': 'Agent workflow built November 3 on an October 20–21 preparatory prototype. See the event-work disclosure; organizer eligibility is unconfirmed.'}
+
+    def gmail_workspace():
+        return repo.snapshot()['profile'].get('active_workspace') or 'legacy'
+
+    @app.get('/api/gmail/status')
+    def gmail_status():
+        return gmail.status(gmail_workspace())
+
+    @app.post('/api/gmail/configure')
+    async def gmail_configure(request: Request):
+        content=await read_limited(request)
+        if len(content)>16000:raise ValueError('Choose the small OAuth client JSON file, not a service-account key.')
+        try: payload=json.loads(content)
+        except Exception:raise ValueError('Choose a valid Google OAuth client JSON file.') from None
+        gmail.configure(payload)
+        return gmail.status(gmail_workspace())
+
+    @app.post('/api/gmail/start')
+    def gmail_start(request: Request):
+        if request.url.hostname not in {'127.0.0.1','testserver'}:
+            raise HTTPException(409,'Open Sidekick at http://127.0.0.1:8765 before connecting Gmail so Google can return to the same browser session.')
+        try: url,cookie=gmail.start(gmail_workspace())
+        except GmailError as exc:raise HTTPException(409,str(exc)) from None
+        response=JSONResponse({'authorization_url':url})
+        response.set_cookie(FLOW_COOKIE,cookie,httponly=True,samesite='lax',max_age=600,path=CALLBACK_PATH)
+        return response
+
+    @app.get(CALLBACK_PATH)
+    def gmail_callback(request: Request, state: str = '', code: str = '', error: str = ''):
+        try: success=gmail.finish(state,request.cookies.get(FLOW_COOKIE,''),code,error,gmail_workspace())
+        except GmailError:success=False
+        response=RedirectResponse('/?gmail='+('connected' if success else 'failed'),status_code=303)
+        response.delete_cookie(FLOW_COOKIE,path=CALLBACK_PATH)
+        return response
+
+    @app.post('/api/gmail/disconnect')
+    def gmail_disconnect():
+        return gmail.disconnect()
 
     @app.post('/api/demo')
     def load_demo():
