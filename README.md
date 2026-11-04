@@ -2,6 +2,12 @@
 
 Sidekick turns approved school and project updates into suggested priorities and prepared work. It compares saved source revisions and task progress, asks Muse Spark to select up to two local preparation actions, creates drafts, verifies current inputs, and remembers the result.
 
+## Watch the demo
+
+[Watch the 2-minute Sidekick walkthrough](https://github.com/Kevin-Phon/sidekick-meta-hackathon/raw/refs/heads/main/demo/Sidekick-Demo.mp4) · [GitHub video page](demo/Sidekick-Demo.mp4)
+
+The edited walkthrough uses actual app screenshots from successful live Muse Spark runs with fictional source data, plus a synthetic system narrator. It is not a continuous screen recording. It shows changed priorities, generated school/project preparation, and saved progress. No private account data or credentials appear.
+
 ## November 3 event build
 
 The agent workflow is new competition-period work built on an October 20–21 preparatory prototype. See [event-work disclosure](docs/EVENT_WORK.md), [demo script](docs/DEMO_SCRIPT.md), and [submission draft](docs/SUBMISSION_DRAFT.md). Eligibility remains the organizers' decision.

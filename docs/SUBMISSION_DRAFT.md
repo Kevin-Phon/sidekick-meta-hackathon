@@ -13,8 +13,8 @@ Event-built work: See EVENT_WORK.md. Preserve the October 20–21 prototype disc
 Current access: Imported or fictional saved snapshots; live Gmail and Canvas are not connected. Human-triggered source updates and agent runs are labeled. External sends/submissions are not performed.
 
 Missing before submission:
-- Public repository URL (not published yet).
-- Accessible demo video URL (not recorded/uploaded yet).
+- Public repository: https://github.com/Kevin-Phon/sidekick-meta-hackathon
+- Demo video: https://github.com/Kevin-Phon/sidekick-meta-hackathon/raw/refs/heads/main/demo/Sidekick-Demo.mp4 (2:02 edited screenshots with synthetic narration; verify public access before submitting).
 - Kevin's final review, contributor attribution, and submission approval.
 - Confirm live verification evidence and report any remaining limitations accurately.
 
