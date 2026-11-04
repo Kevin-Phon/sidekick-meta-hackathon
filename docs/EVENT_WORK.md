@@ -21,3 +21,7 @@ Do not describe the entire codebase as created during the competition. Organizer
 ## Demonstrated boundaries
 
 Saved file snapshots and fictional sources exercise this workflow. Sidekick does not independently connect to Gmail or Canvas, continuously watch websites, submit assignments, send messages, or complete real project work outside the app. The model selects local preparation actions, and code validates and executes them. Content accuracy requires human review.
+
+## November 3 interface revision
+
+The dashboard now starts empty, with School uploads, saved messages in Mail, project context derived from those sources, and Today focused on priorities/prepared outputs. Agent source consent is in a dialog; optional sample controls live in Settings. Workspaces preserve archived sources rather than deleting data. New installs have no prefilled personal profile. Mail reply drafts are now a supported local preparation type, tested with mocked provider transport; this revision made no paid model requests. Gmail's connection entry honestly reports that Google OAuth setup is not configured.

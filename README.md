@@ -6,15 +6,17 @@ Sidekick turns approved school and project updates into suggested priorities and
 
 [Watch the 2-minute Sidekick walkthrough](https://kevin-phon.github.io/sidekick-meta-hackathon/) · [Download the video](https://kevin-phon.github.io/sidekick-meta-hackathon/demo/Sidekick-Demo.mp4)
 
-The edited walkthrough uses actual app screenshots from successful live Muse Spark runs with fictional source data, plus a synthetic system narrator. It is not a continuous screen recording. It shows changed priorities, generated school/project preparation, and saved progress. No private account data or credentials appear.
+The edited walkthrough introduces the cleaned interface, then labels earlier successful agent validation footage. It uses actual app screenshots from successful live Muse Spark runs with fictional source data, plus a synthetic system narrator. It is not a continuous screen recording. It shows changed priorities, generated school/project preparation, and saved progress. No private account data or credentials appear.
 
 ## November 3 event build
 
 The agent workflow is new competition-period work built on an October 20–21 preparatory prototype. See [event-work disclosure](docs/EVENT_WORK.md), [demo script](docs/DEMO_SCRIPT.md), and [submission draft](docs/SUBMISSION_DRAFT.md). Eligibility remains the organizers' decision.
 
-Run locally using the instructions below. On Today, load the clearly fictional demo sources. Set a fresh key in Memory & connections; never put keys in chat, Git, or source files. Return to Today, review the four selected snapshots and consent, then Run Sidekick. One run makes at most three API requests (one plan, up to two generated drafts), with no automatic retry. Review the plan and open its outputs. Apply the fictional update, run again, mark a sample task complete, and run again to incorporate progress. Repeating identical context skips Meta entirely. Reloading preserves local context and outputs.
+Run locally using the instructions below. Start with an empty workspace: upload a lecture, assignment, or project brief in School; paste a saved message in Mail. Projects collects material with a project label, project-note type, or project-related title. Today brings together suggested priorities and prepared work. Choose Prepare next steps, review up to four exact sources, approve the scope, and run Sidekick. Suggestions, worked drafts and mail reply drafts need review; nothing is sent or submitted.
 
-No live Gmail/Canvas accounts are connected. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
+Muse Spark setup is in Memory & connections. Use a fresh unshared key in the password field. One agent run makes at most three API requests (one plan and up to two preparations); unchanged input skips the model. The everyday dashboard has no seeded examples. Optional samples live under Memory & connections → Saved sources and sample workspace. Start clean workspace preserves previous material and lets you switch back. New installations have no prefilled personal profile.
+
+No live Gmail/Canvas accounts are connected. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. The Connect Gmail entry explains that a separate Google authorization setup is required; saved-email import works now. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
 
 ## Costs and stopping
 

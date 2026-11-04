@@ -19,7 +19,7 @@ def prepare(repo):
         return source['connection_id'] == 'demo' and source['body'] == sample_bodies.get(source['provider_id'])
     for source in state['sources']:
         kind = source['kind']
-        if kind not in {'assignment', 'lecture', 'project_note'}:
+        if kind not in {'assignment', 'lecture', 'project_note', 'mail'}:
             continue
         meta = source['metadata']
         refs = [{'id': source['id'], 'revision': source['revision']}]
@@ -41,6 +41,9 @@ def prepare(repo):
         elif kind == 'lecture':
             draft_kind = 'study_guide'
             content = f'## Source notes\n{source["body"]}\n\n## Study sequence\n1. Identify the key ideas in the source above.\n2. Explain each one in your own words.\n3. Write a practice example and check it against the source.\n\nThis is a source-based outline. Meta AI is not connected; no additional explanations have been generated.'
+        elif kind == 'mail':
+            draft_kind, status = 'mail_reply', 'needs_input'
+            content = f'## Saved message\n{source["body"]}\n\n## Reply preparation\nRun Sidekick with this selected message to prepare a source-grounded reply draft. Nothing has been sent. This is a local source outline; no AI reply has been generated.'
         else:
             draft_kind = 'meeting_brief'
             content = f'## Your recorded progress\n{source["body"]}\n\n## A short meeting structure\n- What I finished\n- What is in progress\n- What is blocked\n- My next step and any help I need\n\nUse the recorded progress above. Add missing facts yourself. This is a source-based outline, not a live AI generation.'

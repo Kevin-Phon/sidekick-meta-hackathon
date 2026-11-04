@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 from app.sources.imports import normalize_items
 
 
@@ -40,6 +41,11 @@ class Repository:
                    (kind, value['id'], json.dumps(value)))
 
     def import_items(self, items):
+        active = self.update_profile({}).get('active_workspace')
+        if active and active != 'legacy' and isinstance(items, list):
+            items = [{**item, 'connection_id': f'workspace:{active}:' + str(item.get('connection_id', 'imports')),
+                      'metadata': {**(item.get('metadata') or {}), 'workspace_id': active}}
+                     if isinstance(item, dict) and isinstance(item.get('metadata') or {}, dict) else item for item in items]
         normalized = normalize_items(items)
         counts = {'new_count': 0, 'changed_count': 0}
         with self.db() as db:
@@ -94,13 +100,20 @@ class Repository:
 
     def save_check(self, check):
         with self.db() as db:
-            self._put(db, 'checks', check)
+            row = db.execute('SELECT data FROM settings WHERE id=?', ('profile',)).fetchone()
+            profile = json.loads(row[0]) if row else {}
+            self._put(db, 'checks', {**check, 'workspace_id': profile.get('active_workspace') or 'legacy'})
 
     def update_profile(self, patch):
         with self.db() as db:
             row = db.execute('SELECT data FROM settings WHERE id=?', ('profile',)).fetchone()
-            profile = json.loads(row[0]) if row else {'name': 'Kevin', 'goal': 'Learn, stay organized, and keep moving.', 'daily_enabled': False, 'timezone': 'America/Los_Angeles'}
-            for key in {'name', 'goal', 'daily_enabled'}:
+            profile = json.loads(row[0]) if row else {'name': '', 'goal': '', 'daily_enabled': False, 'timezone': 'America/Los_Angeles'}
+            if 'active_workspace' in patch:
+                allowed = {'legacy'} | {w['id'] for w in self.records('workspaces', db)}
+                if not isinstance(patch['active_workspace'], str) or patch['active_workspace'] not in allowed:
+                    raise ValueError('Choose an existing workspace.')
+            for key in {'name', 'goal', 'daily_enabled', 'active_workspace'}:
+
                 if key in patch:
                     profile[key] = patch[key]
             db.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data', ('profile', json.dumps(profile)))
@@ -109,8 +122,25 @@ class Repository:
     def snapshot(self):
         with self.db() as db:
             row = db.execute('SELECT data FROM settings WHERE id=?', ('profile',)).fetchone()
-            profile = json.loads(row[0]) if row else {'name': 'Kevin', 'goal': 'Learn, stay organized, and keep moving.', 'daily_enabled': False, 'timezone': 'America/Los_Angeles'}
-            return {**{kind: self.records(kind, db) for kind in ('sources', 'tasks', 'drafts', 'checks')}, 'profile': profile}
+            profile = json.loads(row[0]) if row else {'name': '', 'goal': '', 'daily_enabled': False, 'timezone': 'America/Los_Angeles'}
+            data = {kind: self.records(kind, db) for kind in ('sources', 'tasks', 'drafts', 'checks')}
+            active = profile.get('active_workspace')
+            if active:
+                data['sources'] = [s for s in data['sources'] if (s['metadata'].get('workspace_id') or 'legacy') == active]
+                ids = {s['id'] for s in data['sources']}
+                data['tasks'] = [t for t in data['tasks'] if t['source_id'] in ids]
+                data['drafts'] = [d for d in data['drafts'] if d['source_refs'] and all(r['id'] in ids for r in d['source_refs'])]
+                data['checks'] = [c for c in data['checks'] if (c.get('workspace_id') or 'legacy') == active]
+            return {**data, 'profile': profile, 'workspaces': [{'id':'legacy','name':'Previous workspace'}] + self.records('workspaces', db)}
+
+    def create_workspace(self, name='My workspace'):
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100:
+            raise ValueError('Name the workspace in 1–100 characters.')
+        workspace = {'id': uuid4().hex, 'name': name.strip(), 'created_at': now_iso()}
+        with self.db() as db:
+            self._put(db, 'workspaces', workspace)
+        self.update_profile({'active_workspace': workspace['id'], 'daily_enabled': False})
+        return workspace
 
     def delete_source(self, source_id):
         with self.db() as db:

@@ -10,7 +10,8 @@ describe('Companion interface',()=>{
  it('shows a genuine empty state instead of fabricated work',async()=>{
   vi.stubGlobal('fetch',vi.fn(async(url:string)=>respond(url.includes('bootstrap')?{token:'test'}:state)));
   render(<App/>);
-  expect(await screen.findByRole('button',{name:/Explore a sample day/})).toBeVisible();
+  expect(await screen.findByText('Your day starts with your material.')).toBeVisible();
+  expect(screen.queryByRole('button',{name:/Explore a sample day/})).toBeNull();
   expect(screen.queryByText('Practice 03')).not.toBeInTheDocument();
  });
  it('explains connection failure without rendering sample results',async()=>{
@@ -20,10 +21,11 @@ describe('Companion interface',()=>{
   expect(screen.queryByText('Worked draft — review needed.')).not.toBeInTheDocument();
  });
  it('opens a saved draft and exposes its source without executing source HTML',async()=>{
-  const data={...state,sources:[{id:'s1',provider_id:'p1',connection_id:'imports',kind:'assignment',title:'My homework',body:'<script>alert(1)</script>',metadata:{},revision:1,fetched_at:'2026-10-20T16:00:00Z'}],drafts:[{id:'d1',kind:'homework',title:'My homework',markdown:'## Worked steps\nTest reasoning\n![private image](https://example.invalid/tracker)',status:'review_needed',provider:'source_outline',source_refs:[{id:'s1',revision:1}],generated_at:'2026-10-20T16:00:00Z'}]};
+  const data={...state,sources:[{id:'s1',provider_id:'p1',connection_id:'imports',kind:'assignment',title:'My homework',body:'<script>alert(1)</script>',metadata:{},revision:1,fetched_at:'2026-10-20T16:00:00Z'}],drafts:[{id:'d1',kind:'homework',title:'My homework',markdown:'## Worked steps\nTest reasoning\n![private image](https://example.invalid/tracker)',status:'review_needed',provider:'meta',source_refs:[{id:'s1',revision:1}],generated_at:'2026-10-20T16:00:00Z'}]};
   vi.stubGlobal('fetch',vi.fn(async(url:string)=>respond(url.includes('bootstrap')?{token:'test'}:data)));
   render(<App/>);
-  await screen.findByText('Good morning, Kevin.');
+  await screen.findByRole('heading',{name:'Your day, a little clearer.'});
+  await screen.findByRole('button',{name:/Open My homework/});
   fireEvent.click(screen.getByRole('button',{name:/Open My homework/}));
   expect(await screen.findByRole('dialog')).toHaveTextContent('Worked steps');
   expect(screen.getByRole('link',{name:'Download'})).toHaveAttribute('href','/api/drafts/d1/download');

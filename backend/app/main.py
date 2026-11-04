@@ -118,7 +118,8 @@ def create_app(settings):
     @app.get('/api/state')
     def state():
         saved = repo.snapshot()
-        runs = repo.records('agent_runs')[-12:]
+        visible_ids = {s['id'] for s in saved['sources']}
+        runs = [r for r in repo.records('agent_runs') if all(ref['id'] in visible_ids for ref in r['source_refs'])][-12:]
         checkpoints = {p['id']: p for p in repo.records('agent_checkpoints')}
         by_id = {s['id']: s for s in saved['sources']}
         for run in runs:
@@ -149,7 +150,7 @@ def create_app(settings):
         return {**counts, **check()}
 
     @app.post('/api/import/file')
-    async def import_file(request: Request, filename: str, kind: str = 'lecture', title: str = '', course: str = '', due_at: str = ''):
+    async def import_file(request: Request, filename: str, kind: str = 'lecture', title: str = '', course: str = '', due_at: str = '', project: str = ''):
         suffix = Path(filename).suffix.lower()
         if suffix not in {'.pdf', '.txt', '.md', '.json'} or '/' in filename or '\\' in filename:
             raise ValueError('Choose a PDF, text, Markdown, or JSON file.')
@@ -175,7 +176,7 @@ def create_app(settings):
                 raise ValueError('No readable text was found. Scanned files need text extraction first.')
             identity = hashlib.sha256(json.dumps([filename, kind, course, title, text], ensure_ascii=False).encode()).hexdigest()
             items = [{'provider_id': identity, 'title': title or Path(filename).stem, 'kind': kind,
-                      'body': text, 'due_at': due_at or None, 'metadata': {'course': course, 'filename': filename}}]
+                      'body': text, 'due_at': due_at or None, 'metadata': {'course': course, 'project': project, 'filename': filename}}]
         counts = repo.import_items(items)
         return {**counts, **check()}
 
@@ -190,6 +191,18 @@ def create_app(settings):
             raise ValueError('Task updates must be an object.')
         return repo.update_task(task_id, patch)
 
+    @app.post('/api/workspaces')
+    async def new_workspace(request: Request):
+        payload = json.loads(await read_limited(request))
+        if not isinstance(payload, dict):
+            raise ValueError('Workspace details must be an object.')
+        if not run_lock.acquire(blocking=False):
+            raise HTTPException(409, 'Wait for the current preparation before changing workspace.')
+        try:
+            return repo.create_workspace(payload.get('name', 'My workspace'))
+        finally:
+            run_lock.release()
+
     @app.patch('/api/profile')
     async def profile(request: Request):
         patch = json.loads(await read_limited(request))
@@ -197,6 +210,13 @@ def create_app(settings):
             raise ValueError('Name and goals must be text under 3,000 characters.')
         if 'daily_enabled' in patch and not isinstance(patch['daily_enabled'], bool):
             raise ValueError('Daily preparation must be on or off.')
+        if 'active_workspace' in patch:
+            if not run_lock.acquire(blocking=False):
+                raise HTTPException(409, 'Wait for the current preparation before changing workspace.')
+            try:
+                return repo.update_profile(patch)
+            finally:
+                run_lock.release()
         return repo.update_profile(patch)
 
     @app.delete('/api/sources/{source_id}')
@@ -245,7 +265,7 @@ def create_app(settings):
             if not isinstance(hashes, dict) or any(not isinstance(hashes.get(i), str) or hashes[i] != saved[i]['content_hash'] for i in ids):
                 raise ValueError('Selected material no longer matches your preview. Reload and approve again.')
             sources = [saved[i] for i in ids]
-            if sources[0]['kind'] not in {'lecture', 'assignment', 'project_note'}:
+            if sources[0]['kind'] not in {'lecture', 'assignment', 'project_note', 'mail'}:
                 raise ValueError('Start with a lecture, assignment, or project note.')
             try:
                 result = MetaClient(model_state['key']).generate(sources)

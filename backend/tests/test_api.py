@@ -24,7 +24,8 @@ def test_full_demo_cycle_and_download(tmp_path):
     assert c.post('/api/demo').status_code == 200
     state = c.get('/api/state').json()
     assert len(state['sources']) == 5
-    assert len(state['drafts']) == 3
+    assert len(state['drafts']) == 4
+    assert any(d['kind'] == 'mail_reply' for d in state['drafts'])
     assert c.post('/api/checks').json()['draft_count'] == 0
     task = state['tasks'][0]
     assert c.patch('/api/tasks/' + task['id'], json={'status': 'done'}).status_code == 200
