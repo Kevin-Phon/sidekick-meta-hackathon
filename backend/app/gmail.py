@@ -8,6 +8,7 @@ import secrets
 import threading
 import time
 from urllib.parse import urlencode
+from app.gmail_messages import snapshot
 
 import httpx
 
@@ -61,7 +62,7 @@ class GmailConnection:
             connected = bool(account and account['workspace']==workspace and account['expires_at']>time.time())
             return {'configured':bool(self.client_id),'connected':connected,'email':account['email'] if connected else '',
                     'scope':'read-only','redirect_uri':REDIRECT,'session_only':True,
-                    'detail':'Connected for this session. No messages imported.' if connected else 'Sign in to connect Gmail for this session.' if self.client_id else 'Google developer setup is required once before sign-in.'}
+                    'detail':'Connected for this session. Read-only Gmail access.' if connected else 'Sign in to connect Gmail for this session.' if self.client_id else 'Google developer setup is required once before sign-in.'}
 
     def start(self, workspace):
         with self.lock:
@@ -121,6 +122,30 @@ class GmailConnection:
             self.pending.clear()
             self.account={'token':access,'email':email,'workspace':workspace,'expires_at':time.time()+expiry-30}
             return True
+
+    def recent(self, workspace):
+        with self.lock:
+            account=self.account
+            if not account or account['workspace']!=workspace or account['expires_at']<=time.time():
+                raise GmailError('Reconnect Gmail in this workspace before importing messages.')
+            headers={'Authorization':'Bearer '+account['token']}
+            listed=self._json('GET','https://gmail.googleapis.com/gmail/v1/users/me/messages',headers=headers,
+                              params={'maxResults':5,'labelIds':'INBOX','includeSpamTrash':'false'})
+            entries=listed.get('messages',[])
+            if not isinstance(entries,list):raise GmailError('Google returned an invalid inbox list.')
+            items=[];skipped=0;seen=set()
+            identity=hashlib.sha256(account['email'].casefold().encode()).hexdigest()[:24]
+            for entry in entries[:5]:
+                message_id=entry.get('id') if isinstance(entry,dict) else None
+                if not isinstance(message_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',message_id) or message_id in seen:
+                    skipped+=1;continue
+                seen.add(message_id)
+                try:
+                    message=self._json('GET','https://gmail.googleapis.com/gmail/v1/users/me/messages/'+message_id,headers=headers,params={'format':'full'})
+                    if message.get('id')!=message_id:raise ValueError('Invalid message identity.')
+                    item=snapshot(message,account['email']);item['connection_id']='gmail:'+identity;items.append(item)
+                except (GmailError,ValueError,TypeError,KeyError):skipped+=1
+            return {'items':items,'skipped_count':skipped}
 
     def disconnect(self):
         with self.lock:

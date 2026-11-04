@@ -171,6 +171,18 @@ def create_app(settings):
         response.delete_cookie(FLOW_COOKIE,path=CALLBACK_PATH)
         return response
 
+    @app.post('/api/gmail/import')
+    async def gmail_import(request: Request):
+        try: payload=json.loads(await read_limited(request))
+        except Exception:raise ValueError('Approve importing five recent inbox messages.') from None
+        if not isinstance(payload,dict) or payload.get('consent') is not True:
+            raise ValueError('Approve importing five recent inbox messages.')
+        workspace=gmail_workspace()
+        try: result=await asyncio.to_thread(gmail.recent,workspace)
+        except GmailError as exc:raise HTTPException(409,str(exc)) from None
+        counts=repo.import_items(result['items'],expected_workspace=workspace)
+        return {**counts,'fetched_count':len(result['items']),'skipped_count':result['skipped_count']}
+
     @app.post('/api/gmail/disconnect')
     def gmail_disconnect():
         return gmail.disconnect()

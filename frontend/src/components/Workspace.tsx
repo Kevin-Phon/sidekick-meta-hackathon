@@ -3,7 +3,7 @@ import type {Draft,Source,State,Task} from '../types';
 
 export function date(value?:string,short=false){return value?new Date(value).toLocaleString('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',...(short?{}:{hour:'numeric',minute:'2-digit'})}):'No confirmed deadline';}
 export function category(source?:Source){return String(source?.metadata.course||source?.metadata.project||(source?.kind==='mail'?'Mail':'Your workspace'));}
-export const draftLabel:Record<string,string>={homework:'Worked homework',study_guide:'Study guide',meeting_brief:'Meeting brief',daily_brief:'Daily brief',mail_reply:'Reply draft'};
+export const draftLabel:Record<string,string>={homework:'Worked homework',study_guide:'Study guide',meeting_brief:'Meeting brief',daily_brief:'Daily brief',mail_reply:'Mail recommendation'};
 export function DraftCards({drafts,open}:{drafts:Draft[];open:(d:Draft)=>void}){
  return <div className="draft-grid">{drafts.map(d=>{const Icon=d.kind==='homework'?FileText:d.kind==='meeting_brief'?Users:BookOpen;return <button key={d.id} className="draft-card" onClick={()=>open(d)} aria-label={'Open '+d.title+' '+draftLabel[d.kind]}><span className={'document-icon '+d.kind}><Icon size={21}/></span><span className="eyebrow">{draftLabel[d.kind]||d.kind}</span><h3>{d.title}</h3><span className="draft-foot"><span>{d.status==='needs_input'?'Needs a connection or source':d.status==='restricted'?'Study preparation only':'Ready for your review'}</span><ArrowUpRight size={17}/></span></button>;})}</div>;
 }

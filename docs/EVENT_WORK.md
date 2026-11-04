@@ -20,7 +20,7 @@ Do not describe the entire codebase as created during the competition. Organizer
 
 ## Demonstrated boundaries
 
-Saved file snapshots and fictional sources exercise this workflow. Sidekick does not independently connect to Gmail or Canvas, continuously watch websites, submit assignments, send messages, or complete real project work outside the app. The model selects local preparation actions, and code validates and executes them. Content accuracy requires human review.
+Saved file snapshots and fictional sources exercise this workflow. At the November 3 demonstration, Sidekick did not independently connect to Gmail or Canvas, continuously watch websites, submit assignments, send messages, or complete real project work outside the app. Later November 4 Gmail changes are disclosed below. The model selects local preparation actions, and code validates and executes them. Content accuracy requires human review.
 
 ## November 3 interface revision
 
@@ -33,3 +33,7 @@ Original PDF retention, bounded local page rendering, explicit image-page consen
 ## November 4 Gmail sign-in revision
 
 Added Google authorization-code/PKCE flow, explicit one-time developer setup, read-only Gmail scope, session-only credentials/access token, state/cookie/workspace binding, profile verification, and disconnect/revocation. The configured Connect Gmail button navigates directly to Google. Automated checks exercise success/denial, expiry/replay, multiple-flow invalidation, canonical host enforcement, credential privacy, sanitized provider errors, and frontend navigation. No inbox-import, automatic sorting, message sending, or Meta transfer is claimed. Live account connection depends on developer setup and the user's Google permission approval.
+
+## November 4 Gmail inbox preview revision
+
+Added explicit five-message inbox import via read-only Gmail GET requests, bounded MIME text extraction, HTML stripping with no resource loading, stable mailbox/message identities, source snapshots and atomic workspace binding. Mail cards show sender/time/Gmail Important provenance and provide a source-consented Meta summary/next-step action. No inbox polling, automatic replies or automatic mail-to-Meta transfer. All real mail and account credentials are excluded from public source/demo. Live verification remains separate from automated mocked-provider checks.

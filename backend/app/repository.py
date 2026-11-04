@@ -42,8 +42,10 @@ class Repository:
         db.execute('INSERT INTO records(kind,id,data) VALUES(?,?,?) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data',
                    (kind, value['id'], json.dumps(value)))
 
-    def import_items(self, items, document=None):
+    def import_items(self, items, document=None, expected_workspace=None):
         active = self.update_profile({}).get('active_workspace')
+        if expected_workspace is not None and (active or 'legacy')!=expected_workspace:
+            raise ValueError('Your workspace changed. Import again in the intended workspace.')
         if active and active != 'legacy' and isinstance(items, list):
             items = [{**item, 'connection_id': f'workspace:{active}:' + str(item.get('connection_id', 'imports')),
                       'metadata': {**(item.get('metadata') or {}), 'workspace_id': active}}
@@ -51,6 +53,11 @@ class Repository:
         normalized = normalize_items(items)
         counts = {'new_count': 0, 'changed_count': 0}
         with self.db() as db:
+            if expected_workspace is not None:
+                db.execute('BEGIN IMMEDIATE')
+                row=db.execute("SELECT data FROM settings WHERE id='profile'").fetchone()
+                current=(json.loads(row[0]).get('active_workspace') if row else None) or 'legacy'
+                if current!=expected_workspace:raise ValueError('Your workspace changed. No mail was saved.')
             existing = {x['id']: x for x in self.records('sources', db)}
             tasks = {x['source_id']: x for x in self.records('tasks', db)}
             for item in normalized:
