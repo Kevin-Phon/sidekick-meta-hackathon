@@ -12,10 +12,11 @@ Event-built work: See EVENT_WORK.md. Preserve the October 20–21 prototype disc
 
 Current access: Imported or fictional saved snapshots; live Gmail and Canvas are not connected. Human-triggered source updates and agent runs are labeled. External sends/submissions are not performed.
 
-Missing before submission:
+Published materials and remaining review:
 - Public repository: https://github.com/Kevin-Phon/sidekick-meta-hackathon
-- Demo video: https://github.com/Kevin-Phon/sidekick-meta-hackathon/raw/refs/heads/main/demo/Sidekick-Demo.mp4 (2:02 edited screenshots with synthetic narration; verify public access before submitting).
+- Demo player: https://kevin-phon.github.io/sidekick-meta-hackathon/
+- Direct MP4: https://kevin-phon.github.io/sidekick-meta-hackathon/demo/Sidekick-Demo.mp4 (2:02 edited real screenshots with synthetic narration). Public player loaded with correct metadata and no media error.
 - Kevin's final review, contributor attribution, and submission approval.
-- Confirm live verification evidence and report any remaining limitations accurately.
+- Live synthetic verification completed November 3: initial run (3 calls), changed-source run (3 calls), progress-aware run (2 calls); unchanged repeats skipped Meta. Local checks: 49 backend tests, 7 frontend tests, production build passed. No live account connector or continuous observation is claimed.
 
 After submission: Disconnect the model and stop the service. Verify no new API calls can run; no background AI schedule exists in this build. Submission alone does not disable the API account.
