@@ -114,6 +114,17 @@ class Repository:
 
     def delete_source(self, source_id):
         with self.db() as db:
+            # Withdraw the selected source from derived agent memory as well.
+            affected_drafts = set()
+            for run in self.records('agent_runs', db):
+                if any(ref['id'] == source_id for ref in run.get('source_refs', [])):
+                    affected_drafts.update(run.get('draft_ids', []))
+                    db.execute('DELETE FROM records WHERE kind=? AND id=?', ('agent_runs', run['id']))
+            for checkpoint in self.records('agent_checkpoints', db):
+                if any(s['id'] == source_id for s in checkpoint.get('context', {}).get('sources', [])):
+                    db.execute('DELETE FROM records WHERE kind=? AND id=?', ('agent_checkpoints', checkpoint['id']))
+            for draft_id in affected_drafts:
+                db.execute('DELETE FROM records WHERE kind=? AND id=?', ('drafts', draft_id))
             for draft in self.records('drafts', db):
                 if any(ref['id'] == source_id for ref in draft['source_refs']):
                     db.execute('DELETE FROM records WHERE kind=? AND id=?', ('drafts', draft['id']))

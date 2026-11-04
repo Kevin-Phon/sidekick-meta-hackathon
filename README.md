@@ -1,4 +1,28 @@
-# Sidekick — private local companion prototype
+# Sidekick — your AI work partner
+
+Sidekick turns approved school and project updates into suggested priorities and prepared work. It compares saved source revisions and task progress, asks Muse Spark to select up to two local preparation actions, creates drafts, verifies current inputs, and remembers the result.
+
+## November 3 event build
+
+The agent workflow is new competition-period work built on an October 20–21 preparatory prototype. See [event-work disclosure](docs/EVENT_WORK.md), [demo script](docs/DEMO_SCRIPT.md), and [submission draft](docs/SUBMISSION_DRAFT.md). Eligibility remains the organizers' decision.
+
+Run locally using the instructions below. On Today, load the clearly fictional demo sources. Set a fresh key in Memory & connections; never put keys in chat, Git, or source files. Return to Today, review the four selected snapshots and consent, then Run Sidekick. One run makes at most three API requests (one plan, up to two generated drafts), with no automatic retry. Review the plan and open its outputs. Apply the fictional update, run again, mark a sample task complete, and run again to incorporate progress. Repeating identical context skips Meta entirely. Reloading preserves local context and outputs.
+
+No live Gmail/Canvas accounts are connected. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
+
+## Costs and stopping
+
+Meta bills API usage. Free credits must be active; spend alerts are not hard limits. Check billing after use (it may lag). Disconnect in Memory & connections removes the active in-memory key and blocks subsequent API requests. Stop the server to stop the local service. After the hackathon submission Kevin intends to disconnect and stop the app; submission itself does not do that automatically. No recurring credit monitor is installed.
+
+## Verification and provenance
+
+Backend tests: `.venv/bin/python -m pytest -q`. Frontend: `npm test -- --run`, `npm run build` from `frontend/`. Test responses use mocked transport and are not proof of live inference. Live testing was separately performed November 3 with synthetic sources; see the accompanying verification report for exact outcomes.
+
+The server stores saved sources, task state, generated drafts, and agent checkpoints/activity in `.local/sidekick.db`. API keys stay in process memory. Historical checkpoints support source comparisons; deleting a selected source removes its related agent memory/history and outputs. Generated references identify supplied sources but do not prove every factual statement correct. All prepared work needs review.
+
+---
+
+# Earlier prototype instructions and technical details
 
 A preparatory demo for Kevin's AI companion idea. Competition eligibility for early prototype code remains unverified.
 

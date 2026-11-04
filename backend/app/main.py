@@ -21,6 +21,8 @@ from app.demo import demo_items
 from app.preparation import prepare
 from app.model import MetaClient, ModelError, MODEL
 from app.repository import Repository
+from app.agent import AgentRunner, context, fingerprint
+from app.agent_demo import agent_demo
 from app.scheduler import next_daily_run, should_catch_up
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -116,14 +118,20 @@ def create_app(settings):
     @app.get('/api/state')
     def state():
         saved = repo.snapshot()
-        return {**saved, 'model': model_status(), 'connections': [
+        runs = repo.records('agent_runs')[-12:]
+        checkpoints = {p['id']: p for p in repo.records('agent_checkpoints')}
+        by_id = {s['id']: s for s in saved['sources']}
+        for run in runs:
+            ids = [r['id'] for r in run['source_refs']]
+            run['stale'] = any(i not in by_id for i in ids) or fingerprint(context([by_id[i] for i in ids if i in by_id], saved['tasks'])) != run['fingerprint']
+        return {**saved, 'agent_runs': runs, 'model': model_status(), 'connections': [
             {'id': 'imports', 'name': 'Course & project files', 'status': 'local', 'detail': 'Saved snapshots. Import new material to update them.'},
             {'id': 'canvas', 'name': 'Canvas', 'status': 'blocked', 'detail': 'CPP requires an administrator-approved connection. Import course files for now.'},
             {'id': 'gmail', 'name': 'Gmail', 'status': 'not_connected', 'detail': 'Independent app authorization is not configured.'},
             {'id': 'meta', 'name': 'Meta AI', 'status': 'connected' if model_state['verified'] else 'configured' if model_state['key'] else 'not_connected', 'detail': 'Muse Spark 1.3 Standard. Selected-source requests only. ' + ('A real generation has succeeded.' if model_state['verified'] else 'Live generation not yet verified.')}],
             'next_run': next_daily_run(datetime.now(timezone.utc)).isoformat(),
             'mode': 'sample' if any(x['metadata'].get('demo') for x in saved['sources']) else 'local',
-            'eligibility': 'Preparatory prototype. Hackathon build-window eligibility is not yet verified.'}
+            'eligibility': 'Agent workflow built November 3 on an October 20–21 preparatory prototype. See the event-work disclosure; organizer eligibility is unconfirmed.'}
 
     @app.post('/api/demo')
     def load_demo():
@@ -257,6 +265,45 @@ def create_app(settings):
             raise HTTPException(409, 'Meta AI is not connected. Add an API key in Memory & connections.')
         payload = json.loads(await read_limited(request))
         return await asyncio.to_thread(generate_selected, payload)
+
+    @app.post('/api/agent/demo')
+    def agent_demo_load(stage: str = 'initial'):
+        if stage not in {'initial', 'update'}:
+            raise ValueError('Choose initial or update demo stage.')
+        if run_lock.locked():
+            raise HTTPException(409, 'Wait for the current preparation.')
+        return {**repo.import_items(agent_demo(stage)), **check()}
+
+    def run_agent(payload):
+        if not model_state['key']:
+            raise HTTPException(409, 'Add a replacement API key in Memory & connections first.')
+        if not isinstance(payload, dict) or payload.get('consent') is not True:
+            raise ValueError('Approve the selected sources and task progress before running.')
+        ids = payload.get('source_ids')
+        if not isinstance(ids, list) or not 1 <= len(ids) <= 4 or any(not isinstance(i, str) for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError('Select one to four distinct sources.')
+        if not run_lock.acquire(blocking=False):
+            raise HTTPException(409, 'A preparation is already running.')
+        try:
+            by_id = {s['id']: s for s in repo.snapshot()['sources']}
+            revisions, hashes = payload.get('source_revisions'), payload.get('source_hashes')
+            if not isinstance(revisions, dict) or not isinstance(hashes, dict) or any(i not in by_id or type(revisions.get(i)) is not int or revisions[i] != by_id[i]['revision'] or hashes.get(i) != by_id[i]['content_hash'] for i in ids):
+                raise ValueError('Material changed or approval is incomplete. Reload the preview and approve again.')
+            try:
+                result = AgentRunner(repo, MetaClient(model_state['key'])).run([by_id[i] for i in ids])
+            except ModelError as exc:
+                model_state['last_error'] = str(exc)
+                raise HTTPException(502, str(exc)) from None
+            if result['status'] == 'completed':
+                model_state.update(verified=True, last_error='')
+            return result
+        finally:
+            run_lock.release()
+
+    @app.post('/api/agent/run')
+    async def agent_run(request: Request):
+        payload = json.loads(await read_limited(request))
+        return await asyncio.to_thread(run_agent, payload)
 
     frontend = ROOT / 'frontend' / 'dist'
     if frontend.exists():
