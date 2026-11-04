@@ -4,7 +4,7 @@ Sidekick turns approved school and project updates into suggested priorities and
 
 ## Watch the demo
 
-[Watch the 2-minute Sidekick walkthrough](https://kevin-phon.github.io/sidekick-meta-hackathon/) · [Download the video](https://kevin-phon.github.io/sidekick-meta-hackathon/demo/Sidekick-Demo.mp4)
+[Watch the 2:38 Sidekick walkthrough](https://kevin-phon.github.io/sidekick-meta-hackathon/) · [Download the video](https://kevin-phon.github.io/sidekick-meta-hackathon/demo/Sidekick-Demo.mp4)
 
 The edited walkthrough introduces the cleaned interface, then labels earlier successful agent validation footage. It uses actual app screenshots from successful live Muse Spark runs with fictional source data, plus a synthetic system narrator. It is not a continuous screen recording. It shows changed priorities, generated school/project preparation, and saved progress. No private account data or credentials appear.
 
