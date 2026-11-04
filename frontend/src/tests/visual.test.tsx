@@ -34,3 +34,10 @@ it('keeps the requested explanation target first when supporting notes are selec
  expect(JSON.parse(options.body as string).source_ids).toEqual(['b','a']);
  vi.unstubAllGlobals();
 });
+
+it('keeps lengthy notes collapsed when a visual lesson is available',()=>{
+ render(<LearningView draft={{...draft,markdown:'Overview paragraph.\n\nExtra detailed notes.'}}/>);
+ expect(screen.getAllByText('Overview paragraph.').some(el=>!el.closest('details'))).toBe(true);
+ expect(screen.getByText('Extra detailed notes.')).not.toBeVisible();
+ expect(document.querySelector('details')?.open).toBe(false);
+});
