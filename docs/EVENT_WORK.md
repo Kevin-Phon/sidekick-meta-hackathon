@@ -25,3 +25,7 @@ Saved file snapshots and fictional sources exercise this workflow. Sidekick does
 ## November 3 interface revision
 
 The dashboard now starts empty, with School uploads, saved messages in Mail, project context derived from those sources, and Today focused on priorities/prepared outputs. Agent source consent is in a dialog; optional sample controls live in Settings. Workspaces preserve archived sources rather than deleting data. New installs have no prefilled personal profile. Mail reply drafts are now a supported local preparation type, tested with mocked provider transport; this revision made no paid model requests. Gmail's connection entry honestly reports that Google OAuth setup is not configured.
+
+## November 4 visual learning revision
+
+Original PDF retention, bounded local page rendering, explicit image-page consent, multimodal Muse Spark request content, validated structured teaching steps/concept graphs, an interactive SVG lesson view, original-slide comparison, and a direct School explanation action were added during the event. PDF contents remain outside the public repository. Automated checks use synthetic documents and mocked provider transport; the interface preview is fictional and makes no Meta request. Live visual inference remains unverified pending a session key; the public video is earlier agent validation.

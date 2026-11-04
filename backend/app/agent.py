@@ -8,7 +8,7 @@ from app.repository import now_iso
 
 def context(sources, tasks):
     ids = {s['id'] for s in sources}
-    return {'sources': sorted(sources, key=lambda s: s['id']),
+    return {'sources': sorted([{k:v for k,v in s.items() if k!='_vision_images'} for s in sources], key=lambda s: s['id']),
             'tasks': sorted([{k: t.get(k) for k in ('id','source_id','status','due_at','snoozed_until')} for t in tasks if t['source_id'] in ids], key=lambda t: t['id'])}
 
 
@@ -46,7 +46,10 @@ class AgentRunner:
             raise ValueError('Choose one to four unrestricted sources.')
         snapshot = self.repo.snapshot()
         supplied = context(sources, snapshot['tasks'])
-        scope = hashlib.sha256(','.join(sorted(s['id'] for s in sources)).encode()).hexdigest()
+        scope_text=','.join(sorted(s['id'] for s in sources))
+        if any(s.get('_vision_images') for s in sources):
+            scope_text+=json.dumps(sorted((s['id'],[i['page'] for i in s.get('_vision_images',[])]) for s in sources))
+        scope = hashlib.sha256(scope_text.encode()).hexdigest()
         previous = next((p for p in self.repo.records('agent_checkpoints') if p['id'] == scope), {})
         digest = fingerprint(supplied)
         if previous.get('fingerprint') == digest:

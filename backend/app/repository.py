@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -18,7 +19,8 @@ class Repository:
         with self.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS records (kind TEXT, id TEXT, data TEXT NOT NULL, PRIMARY KEY(kind,id))')
             db.execute('CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, data TEXT NOT NULL)')
-            db.execute('PRAGMA user_version = 1')
+            db.execute('CREATE TABLE IF NOT EXISTS documents (source_id TEXT PRIMARY KEY, source_hash TEXT NOT NULL, page_count INTEGER NOT NULL, content BLOB NOT NULL)')
+            db.execute('PRAGMA user_version = 2')
         self.path.chmod(0o600)
 
     @contextmanager
@@ -40,7 +42,7 @@ class Repository:
         db.execute('INSERT INTO records(kind,id,data) VALUES(?,?,?) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data',
                    (kind, value['id'], json.dumps(value)))
 
-    def import_items(self, items):
+    def import_items(self, items, document=None):
         active = self.update_profile({}).get('active_workspace')
         if active and active != 'legacy' and isinstance(items, list):
             items = [{**item, 'connection_id': f'workspace:{active}:' + str(item.get('connection_id', 'imports')),
@@ -64,6 +66,8 @@ class Repository:
                         if any(r['id'] == item['id'] for r in draft['source_refs']):
                             db.execute('DELETE FROM records WHERE kind=? AND id=?', ('drafts', draft['id']))
                 self._put(db, 'sources', item)
+                if document is not None:
+                    db.execute('INSERT INTO documents VALUES(?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET source_hash=excluded.source_hash,page_count=excluded.page_count,content=excluded.content', (item['id'],item['content_hash'],document['page_count'],document['content']))
                 existing[item['id']] = item
                 if item['kind'] in {'assignment', 'project_note'}:
                     previous = tasks.get(item['id'], {})
@@ -131,6 +135,9 @@ class Repository:
                 data['tasks'] = [t for t in data['tasks'] if t['source_id'] in ids]
                 data['drafts'] = [d for d in data['drafts'] if d['source_refs'] and all(r['id'] in ids for r in d['source_refs'])]
                 data['checks'] = [c for c in data['checks'] if (c.get('workspace_id') or 'legacy') == active]
+            for source in data['sources']:
+                row=db.execute('SELECT page_count FROM documents WHERE source_id=? AND source_hash=?',(source['id'],source['content_hash'])).fetchone()
+                source['visual_document']={'page_count':row[0]} if row else None
             return {**data, 'profile': profile, 'workspaces': [{'id':'legacy','name':'Previous workspace'}] + self.records('workspaces', db)}
 
     def create_workspace(self, name='My workspace'):
@@ -141,6 +148,25 @@ class Repository:
             self._put(db, 'workspaces', workspace)
         self.update_profile({'active_workspace': workspace['id'], 'daily_enabled': False})
         return workspace
+
+    def attach_document(self, source_id, expected_hash, content, page_count):
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            old=next((s for s in self.records('sources',db) if s['id']==source_id),None)
+            if not old or old['content_hash']!=expected_hash:
+                raise ValueError('Source changed before original PDF recovery.')
+            item=normalize_items([{**old,'metadata':{**old['metadata'],'pdf_sha256':hashlib.sha256(content).hexdigest()}}])[0]
+            item['revision']=old['revision']+1
+            self._put(db,'sources',item)
+            for draft in self.records('drafts',db):
+                if any(r['id']==source_id for r in draft['source_refs']):
+                    db.execute('DELETE FROM records WHERE kind=? AND id=?',('drafts',draft['id']))
+            db.execute('INSERT INTO documents VALUES(?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET source_hash=excluded.source_hash,page_count=excluded.page_count,content=excluded.content',(source_id,item['content_hash'],page_count,content))
+
+    def document(self, source):
+        with self.db() as db:
+            row=db.execute('SELECT page_count,content FROM documents WHERE source_id=? AND source_hash=?',(source['id'],source['content_hash'])).fetchone()
+            return {'page_count':row[0],'content':row[1]} if row else None
 
     def delete_source(self, source_id):
         with self.db() as db:
@@ -159,6 +185,7 @@ class Repository:
                 if any(ref['id'] == source_id for ref in draft['source_refs']):
                     db.execute('DELETE FROM records WHERE kind=? AND id=?', ('drafts', draft['id']))
             db.execute('DELETE FROM records WHERE kind=? AND id=?', ('tasks', 'task-' + source_id))
+            db.execute('DELETE FROM documents WHERE source_id=?',(source_id,))
             deleted = db.execute('DELETE FROM records WHERE kind=? AND id=?', ('sources', source_id)).rowcount
             if not deleted:
                 raise KeyError(source_id)

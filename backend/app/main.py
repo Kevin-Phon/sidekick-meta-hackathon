@@ -23,6 +23,7 @@ from app.model import MetaClient, ModelError, MODEL
 from app.repository import Repository
 from app.agent import AgentRunner, context, fingerprint
 from app.agent_demo import agent_demo
+from app.visual_learning import render_page, approve_pages, teaching_markdown
 from app.scheduler import next_daily_run, should_catch_up
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -98,7 +99,7 @@ def create_app(settings):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; style-src 'self' 'unsafe-inline'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; style-src 'self' 'unsafe-inline'"
         return response
 
     @app.exception_handler(ValueError)
@@ -151,6 +152,7 @@ def create_app(settings):
 
     @app.post('/api/import/file')
     async def import_file(request: Request, filename: str, kind: str = 'lecture', title: str = '', course: str = '', due_at: str = '', project: str = ''):
+        document = None
         suffix = Path(filename).suffix.lower()
         if suffix not in {'.pdf', '.txt', '.md', '.json'} or '/' in filename or '\\' in filename:
             raise ValueError('Choose a PDF, text, Markdown, or JSON file.')
@@ -168,17 +170,31 @@ def create_app(settings):
                     if len(pdf.pages) > 100:
                         raise ValueError('Import a PDF with no more than 100 pages.')
                     text = '\n\n'.join(page.extract_text() or '' for page in pdf.pages)
+                    document = {'content':content,'page_count':len(pdf.pages)}
+                    if not text.strip():
+                        text = f'PDF with {len(pdf.pages)} pages. No extractable text. Select page images for a visual explanation.'
                 else:
                     text = content.decode('utf-8-sig')
             except Exception:
                 raise ValueError('Could not extract text. Use a text-based PDF or import a text/Markdown version.')
             if not text.strip():
                 raise ValueError('No readable text was found. Scanned files need text extraction first.')
-            identity = hashlib.sha256(json.dumps([filename, kind, course, title, text], ensure_ascii=False).encode()).hexdigest()
+            identity = hashlib.sha256(json.dumps([filename, kind, course, title, text, hashlib.sha256(content).hexdigest() if document else None], ensure_ascii=False).encode()).hexdigest()
             items = [{'provider_id': identity, 'title': title or Path(filename).stem, 'kind': kind,
-                      'body': text, 'due_at': due_at or None, 'metadata': {'course': course, 'project': project, 'filename': filename}}]
-        counts = repo.import_items(items)
+                      'body': text, 'due_at': due_at or None, 'metadata': {'course': course, 'project': project, 'filename': filename, **({'pdf_sha256':hashlib.sha256(content).hexdigest()} if document else {})}}]
+        counts = repo.import_items(items, document=document)
         return {**counts, **check()}
+
+    @app.get('/api/sources/{source_id}/pages/{page}')
+    def source_page(source_id: str, page: int, version: str = ''):
+
+        source=next((s for s in repo.snapshot()['sources'] if s['id']==source_id),None)
+        if source and version and version!=source['content_hash']:
+            raise HTTPException(409,'This source changed. Reload its preview before selecting pages.')
+        document=repo.document(source) if source else None
+        if not document:
+            raise KeyError(source_id)
+        return Response(render_page(document['content'],page),media_type='image/jpeg')
 
     @app.post('/api/checks')
     def prepare_saved():
@@ -230,7 +246,7 @@ def create_app(settings):
         if not draft:
             raise KeyError(draft_id)
         refs = '\n'.join(f'- {r["id"]}, revision {r["revision"]}' for r in draft['source_refs'])
-        exported = f'# {draft["title"]}\n\nReview required. Provider: {draft["provider"]}; model: {draft["model"]}.\nGenerated: {draft["generated_at"]}\n\n{draft["markdown"]}\n\n## Source references\n{refs}\n'
+        exported = f'# {draft["title"]}\n\nReview required. Provider: {draft["provider"]}; model: {draft["model"]}.\nGenerated: {draft["generated_at"]}\n\n{teaching_markdown(draft)}\n\n## Source references\n{refs}\n'
         return Response(exported, media_type='text/markdown', headers={'Content-Disposition': f'attachment; filename="sidekick-{draft["kind"]}.md"'})
 
     @app.post('/api/model/key')
@@ -264,7 +280,7 @@ def create_app(settings):
             hashes = payload.get('source_hashes')
             if not isinstance(hashes, dict) or any(not isinstance(hashes.get(i), str) or hashes[i] != saved[i]['content_hash'] for i in ids):
                 raise ValueError('Selected material no longer matches your preview. Reload and approve again.')
-            sources = [saved[i] for i in ids]
+            sources = approve_pages(repo,[saved[i] for i in ids],payload.get('visual_pages',{}))
             if sources[0]['kind'] not in {'lecture', 'assignment', 'project_note', 'mail'}:
                 raise ValueError('Start with a lecture, assignment, or project note.')
             try:
@@ -310,7 +326,7 @@ def create_app(settings):
             if not isinstance(revisions, dict) or not isinstance(hashes, dict) or any(i not in by_id or type(revisions.get(i)) is not int or revisions[i] != by_id[i]['revision'] or hashes.get(i) != by_id[i]['content_hash'] for i in ids):
                 raise ValueError('Material changed or approval is incomplete. Reload the preview and approve again.')
             try:
-                result = AgentRunner(repo, MetaClient(model_state['key'])).run([by_id[i] for i in ids])
+                result = AgentRunner(repo, MetaClient(model_state['key'])).run(approve_pages(repo,[by_id[i] for i in ids],payload.get('visual_pages',{})))
             except ModelError as exc:
                 model_state['last_error'] = str(exc)
                 raise HTTPException(502, str(exc)) from None

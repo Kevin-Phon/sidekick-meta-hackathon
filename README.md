@@ -18,6 +18,14 @@ Muse Spark setup is in Memory & connections. Use a fresh unshared key in the pas
 
 No live Gmail/Canvas accounts are connected. Imports and manually triggered runs demonstrate the bounded agent core; continuous background observation is future work. The Connect Gmail entry explains that a separate Google authorization setup is required; saved-email import works now. The local 9 AM scheduler only makes local source outlines and never calls Meta. Never expose this app's port to the internet.
 
+## Visual learning (November 4)
+
+In School, choose **Explain with Meta** on a lecture or assignment. Review the extracted text and select up to four PDF page images across the approved sources. The original slide viewer stays local; only the chosen page images and approved source packet are included in that model request. This makes diagram-only and scanned pages available to Muse Spark alongside the text. One direct explanation makes one API request.
+
+Lessons show a short overview, beginner-friendly steps with small examples, and up to two interactive concept diagrams when useful. Muse Spark supplies validated nodes and connections; Sidekick draws those as SVG. This is a teaching sketch, not a separate image-generation service or an exact reproduction of the lecture. Click a concept to read its explanation, and compare it with the original slide. Image interpretation and connections still need review.
+
+Original PDFs are stored privately in the local SQLite database, bound to the source content hash. Older text-only imports need the original PDF added again. Local rendering is bounded to 1,400 pixels and 400 KB per page image; page images are sent only with explicit approval. Automated tests cover image payloads, output validation, source/version binding, and the lesson interface. Live visual generation has not yet been verified; the published video demonstrates the earlier agent workflow.
+
 ## Costs and stopping
 
 Meta bills API usage. Free credits must be active; spend alerts are not hard limits. Check billing after use (it may lag). Disconnect in Memory & connections removes the active in-memory key and blocks subsequent API requests. Stop the server to stop the local service. After the hackathon submission Kevin intends to disconnect and stop the app; submission itself does not do that automatically. No recurring credit monitor is installed.
@@ -61,13 +69,13 @@ Then use the run command above. For tests: `.venv/bin/python -m pytest -q`, and 
 
 ## Try it
 
-Explore the sample day, open a worked homework draft, inspect its sources, download Markdown, mark a task complete, and reload. Projects accepts progress notes. Add material accepts selectable-text PDF, TXT, Markdown, and JSON. Imported course material receives a source outline or missing-input checklist. It does not receive invented AI answers.
+Explore the sample day, open a worked homework draft, inspect its sources, download Markdown, mark a task complete, and reload. Projects accepts progress notes. Add material accepts PDF (including image-only pages), TXT, Markdown, and JSON. Imported course material receives a source outline or missing-input checklist. It does not receive invented AI answers.
 
 JSON accepts an `items` array with title, body, kind (lecture/assignment/announcement/project_note/mail), optional provider_id, due_at with timezone, metadata.course/project and assessment restriction flags. Reusing an explicit connection_id/provider_id updates that source and invalidates its old derived drafts. File imports use content/context identity: changed files become separate snapshots; delete an obsolete snapshot individually in Settings. Identical imports are idempotent.
 
 ## Boundaries and storage
 
-All source data, profile, task progress and prepared drafts persist in `.local/sidekick.db`. The database is owner-readable/writable; it is not encrypted. No API credential is bundled. Gmail and live Canvas are not connected. Muse Spark generation is implemented but live verification needs your key and available API credits. CPP currently requires administrator approval for Canvas access. Sample worked answers are prewritten and labeled. HTML is inert; embedded Markdown images are omitted and the app blocks external media with CSP. Opening a chosen HTTPS source link is a user action.
+All source data, original uploaded PDFs, profile, task progress and prepared drafts persist in `.local/sidekick.db`. The database is owner-readable/writable; it is not encrypted. No API credential is bundled. Gmail and live Canvas are not connected. Muse Spark generation is implemented but live verification needs your key and available API credits. CPP currently requires administrator approval for Canvas access. Sample worked answers are prewritten and labeled. HTML is inert; embedded Markdown images are omitted and the app blocks external media with CSP. Opening a chosen HTTPS source link is a user action.
 
 Settings can enable 9 AM America/Los_Angeles preparation of saved material. The service must be running. It catches up after a missed morning. This does not fetch accounts or install a background system job. Nothing is sent, submitted, or marked complete automatically. Source deletion affects that selected source and dependent local records only.
 
@@ -79,6 +87,6 @@ Open Memory & connections → Muse Spark. Enter a Meta Model API key into the pa
 
 Select one source and inspect its exact text, title, ID and revision. Approve sending that material to Meta, then Generate with Muse Spark. The app uses muse-spark-1.3 Standard via https://api.meta.ai/v1/chat/completions with a JSON schema. No profile, other sources, URLs or account data are fetched/sent automatically. A successful live generation changes status from Key set/unverified to Verified and saves a labeled draft. Key setup alone does not verify access or credits.
 
-Requests contain at most four sources/32KB total (the UI currently selects one), cap model completion at 4,000 tokens, and cap response at 1MB. HTTP inactivity timeout is 45 seconds and connection timeout10seconds; a slow continuous response can last longer. No automatic retries or paid scheduled calls. Check credits/billing before trying. Provider errors are sanitized; source revisions and content fingerprints must match approval, and changed sources block persistence. A valid citation identity is not proof every generated claim is correct: review the draft.
+Requests contain at most four sources/32KB total of serialized text, plus up to four explicitly approved PDF page images, cap model completion at 4,000 tokens, and cap response at 1MB. HTTP inactivity timeout is 45 seconds and connection timeout10seconds; a slow continuous response can last longer. No automatic retries or paid scheduled calls. Check credits/billing before trying. Provider errors are sanitized; source revisions and content fingerprints must match approval, and changed sources block persistence. A valid citation identity is not proof every generated claim is correct: review the draft.
 
 Official references: https://dev.meta.ai/docs/models, https://dev.meta.ai/docs/structured-output, https://dev.meta.ai/docs/protocols/chat-completions.
