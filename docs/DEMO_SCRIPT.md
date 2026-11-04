@@ -1,11 +1,9 @@
-# Current published demo — 2 minutes 38 seconds
+# Published demo — recorded November 3, 2:38
 
-The video begins with the cleaned Today, School, Mail and Projects screens (about 36 seconds). It explains the material-first flow and explicitly states that live Gmail requires Google authorization setup.
+The video introduces the November 3 cleaned Today, School, Mail and Projects screens, then labels the retained November 3 live agent validation footage. It shows source changes, revised school/project priorities, generated drafts, remembered task progress and zero-call repeats. Sources are fictional. It is an edited screenshot walkthrough with synthetic narration, not a continuous recording.
 
-The remaining footage is labeled “Earlier live agent validation — interface simplified since recording.” It preserves genuine successful Muse Spark results: source changes, revised school/project priorities, generated drafts, remembered progress and zero-call repeats. It is an edited screenshot walkthrough with a synthetic system narrator, not a continuous screen recording.
+The video accurately reflects its recording date: Gmail authorization setup was then unavailable. November 4 added verified visual learning, Google read-only Gmail OAuth, manual five-message inbox snapshots and one source-approved live mail recommendation. These newer features are documented in README.md and EVENT_WORK.md; this video does not claim to show them.
 
-Do not claim that the Mail reply-draft extension has had live provider verification yet; its structured planner/generator path passed mocked-transport tests. The underlying agent previously passed real Meta requests with fictional school/project sources.
+No real course PDF, real inbox, billing/account page, credential or private local database is included. Do not replace this video with private live-test screenshots. No continuous background inbox observation, external message sending or coursework submission is claimed.
 
-Google OAuth and continuous inbox observation are not configured. Current normal workspace starts empty; sample controls are optional in Settings. Old local material remains in the previous workspace. This revision does not send messages or submit coursework.
-
-The final event form still requires Kevin's review and explicit submission approval.
+The final event form requires review and explicit submission approval. The October preparatory prototype and November event work remain separately disclosed; organizers determine eligibility.

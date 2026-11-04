@@ -1,4 +1,6 @@
-# Narration for a short screen walkthrough
+# Archival narration for the November 3 screen walkthrough
+
+This is the recorded script, not a description of the latest feature set. See README.md for November 4 visual learning and Gmail additions.
 
 Sidekick is an AI partner on my side. I want it to keep track of school, projects, messages, and the work I need to do next. Study guides are one thing it can prepare, but the main idea is having a partner that keeps the context together and helps me move forward.
 
